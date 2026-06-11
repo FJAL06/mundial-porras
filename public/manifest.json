@@ -1,0 +1,13 @@
+{
+  "name": "Mundial Porras",
+  "short_name": "Porras",
+  "description": "Juega a las porras del Mundial con tus amigos",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#060f0a",
+  "theme_color": "#060f0a",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
