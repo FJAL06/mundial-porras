@@ -284,15 +284,53 @@ export default function App() {
   const canBet = r => isOpen(r) && currentPlayer && !hasBet(r);
 
   // ── ACTIONS ────────────────────────────────────────────────────────────────
-  const handleRegister = async () => {
-    if (!newPlayer.name.trim()) return showToast('Escribe un nombre');
-    const { data, error } = await supabase.from('players').insert({name:newPlayer.name.trim(), avatar:newPlayer.avatar}).select().single();
-    if (error) return showToast(error.message.includes('unique') ? 'Ese nombre ya existe' : error.message);
-    setCurrentPlayer(data);
-    localStorage.setItem('mundial_player', JSON.stringify(data));
-    setModal(null); setNewPlayer({name:'', avatar:'⚽'});
-    await loadAll(true); boom(); showToast(`¡Bienvenido ${data.avatar} ${data.name}!`);
-  };
+const handleRegister = async () => {
+  const name = newPlayer.name.trim();
+
+  if (!name) return showToast('Escribe un nombre');
+
+  // Buscar si ya existe
+  const { data: existingPlayer } = await supabase
+    .from('players')
+    .select('*')
+    .eq('name', name)
+    .maybeSingle();
+
+  // Si existe, iniciar sesión con ese jugador
+  if (existingPlayer) {
+    setCurrentPlayer(existingPlayer);
+    localStorage.setItem('mundial_player', JSON.stringify(existingPlayer));
+
+    setModal(null);
+    setNewPlayer({ name: '', avatar: '⚽' });
+
+    await loadAll(true);
+    showToast(`¡Bienvenido de nuevo ${existingPlayer.avatar} ${existingPlayer.name}!`);
+    return;
+  }
+
+  // Si no existe, crearlo
+  const { data, error } = await supabase
+    .from('players')
+    .insert({
+      name,
+      avatar: newPlayer.avatar
+    })
+    .select()
+    .single();
+
+  if (error) return showToast(error.message);
+
+  setCurrentPlayer(data);
+  localStorage.setItem('mundial_player', JSON.stringify(data));
+
+  setModal(null);
+  setNewPlayer({ name: '', avatar: '⚽' });
+
+  await loadAll(true);
+  boom();
+  showToast(`¡Bienvenido ${data.avatar} ${data.name}!`);
+};
 
   const handleAdminLogin = () => {
     if (adminPass === ADMIN_PASSWORD) {
@@ -1032,18 +1070,34 @@ export default function App() {
         </nav>
       </div>
 
-      {modal==='register' && (
-        <div className="ov" onClick={e=>e.target===e.currentTarget&&setModal(null)}>
-          <div className="modal">
-            <div className="mhdl"/>
-            <div className="mtit">⚽ Unirse al mundial</div>
-            <div className="fg"><label className="fl">Tu nombre</label><input className="fi" placeholder="¿Cómo te llamas?" value={newPlayer.name} onChange={e=>setNewPlayer({...newPlayer,name:e.target.value})} onKeyDown={e=>e.key==='Enter'&&handleRegister()}/></div>
-            <div className="fg"><label className="fl">Avatar</label><div className="ag">{AVATAR_EMOJIS.map(a=><div key={a} className={`ao${newPlayer.avatar===a?' sel':''}`} onClick={()=>setNewPlayer({...newPlayer,avatar:a})}>{a}</div>)}</div></div>
-            <div style={{fontSize:11,color:'var(--text-muted)',marginBottom:12}}>Tu sesión se guarda en este dispositivo.</div>
-            <button className="btn" onClick={handleRegister}>🚀 Entrar al mundial</button>
-          </div>
-        </div>
-      )}
+{modal==='register' && (
+  <div className="ov" onClick={e=>e.target===e.currentTarget&&setModal(null)}>
+    <div className="modal">
+      <div className="mhdl"/>
+      <div className="mtit">⚽ Entrar al mundial</div>
+
+      <div className="fg">
+        <label className="fl">Tu nombre</label>
+        <input
+          className="fi"
+          placeholder="¿Cómo te llamas?"
+          value={newPlayer.name}
+          onChange={e=>setNewPlayer({...newPlayer,name:e.target.value})}
+          onKeyDown={e=>e.key==='Enter'&&handleRegister()}
+        />
+      </div>
+
+      <div style={{fontSize:11,color:'var(--text-muted)',marginBottom:12}}>
+        Si ya participabas, recuperarás automáticamente tu perfil.
+        Si es tu primera vez, se creará uno nuevo.
+      </div>
+
+      <button className="btn" onClick={handleRegister}>
+        🚀 Continuar
+      </button>
+    </div>
+  </div>
+)}
 
       {modal==='adminlogin' && (
         <div className="ov" onClick={e=>e.target===e.currentTarget&&setModal(null)}>
