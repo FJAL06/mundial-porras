@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { flag, calcPoints, computeStandings, getRoundAwards, ALL_COUNTRIES, AVATAR_EMOJIS, ADMIN_PASSWORD } from '../lib/game';
+import { flag, calcPoints, calcPointsBreakdown, computeStandings, getRoundAwards, ALL_COUNTRIES, AVATAR_EMOJIS, ADMIN_PASSWORD } from '../lib/game';
 
 // ── CSS ───────────────────────────────────────────────────────────────────────
 const css = `
@@ -216,12 +216,14 @@ export default function App() {
   const [adminPass, setAdminPass] = useState('');
   const [newPlayer, setNewPlayer] = useState({name:'', avatar:'⚽'});
   const [betDraft, setBetDraft] = useState({});
+  const [penaltyDraft, setPenaltyDraft] = useState({});  // { matchId: 'home_team' | 'away_team' }
   const [resultsDraft, setResultsDraft] = useState({});
   const [newRoundName, setNewRoundName] = useState('');
   const [newRoundTime, setNewRoundTime] = useState('');
   const [newRoundMatches, setNewRoundMatches] = useState([]);
   const [newMatchHome, setNewMatchHome] = useState('España');
   const [newMatchAway, setNewMatchAway] = useState('Alemania');
+  const [newMatchKnockout, setNewMatchKnockout] = useState(false);
   const [adminTab, setAdminTab] = useState('rounds');
   const toastTimer = useRef(null);
   const [savingBet, setSavingBet] = useState(false);
@@ -348,10 +350,17 @@ const handleRegister = async () => {
     if (!round || !isOpen(round)) return showToast('La jornada ya está cerrada');
     const allFilled = round.matches.every(m => betDraft[m.id] !== undefined && betDraft[m.id].home !== undefined && betDraft[m.id].away !== undefined);
     if (!allFilled) return showToast('Rellena todos los marcadores');
-    const rows = round.matches.map(m => ({
-      player_id: currentPlayer.id, round_id: round.id,
-      match_id: m.id, home_bet: betDraft[m.id].home, away_bet: betDraft[m.id].away,
-    }));
+    const rows = round.matches.map(m => {
+      const betH = betDraft[m.id].home;
+      const betA = betDraft[m.id].away;
+      const isDraw = betH === betA;
+      const penWinner = (m.is_knockout && isDraw) ? (penaltyDraft[m.id] || null) : null;
+      return {
+        player_id: currentPlayer.id, round_id: round.id,
+        match_id: m.id, home_bet: betH, away_bet: betA,
+        penalty_winner: penWinner,
+      };
+    });
     const { error } = await supabase.from('bets').insert(rows);
     if (error && !error.message.includes('duplicate')) return showToast(error.message);
     await loadAll(true); setModal(null); boom(); showToast('✅ ¡Porra guardada!');
@@ -363,7 +372,7 @@ const handleRegister = async () => {
       return showToast('Rellena nombre, fecha y añade partidos');
     const { data: round, error: re } = await supabase.from('rounds').insert({name:newRoundName.trim(), start_time:new Date(newRoundTime).toISOString()}).select().single();
     if (re) return showToast(re.message);
-    const matchRows = newRoundMatches.map((m,i) => ({round_id:round.id, home_team:m.home, away_team:m.away, position:i}));
+    const matchRows = newRoundMatches.map((m,i) => ({round_id:round.id, home_team:m.home, away_team:m.away, position:i, is_knockout:m.is_knockout||false}));
     const { error: me } = await supabase.from('matches').insert(matchRows);
     if (me) return showToast(me.message);
     setNewRoundName(''); setNewRoundTime(''); setNewRoundMatches([]);
@@ -376,7 +385,16 @@ const handleRegister = async () => {
     for (const m of round.matches) {
       const dr = resultsDraft[m.id];
       if (dr !== undefined) {
-        const { error } = await supabase.from('matches').update({home_score:Number(dr.home||0), away_score:Number(dr.away||0), played:true}).eq('id', m.id);
+        const homeScore = Number(dr.home||0);
+        const awayScore = Number(dr.away||0);
+        const isDraw = homeScore === awayScore;
+        const penWinner = (m.is_knockout && isDraw) ? (dr.penalty_winner || null) : null;
+        const { error } = await supabase.from('matches').update({
+          home_score: homeScore,
+          away_score: awayScore,
+          played: true,
+          penalty_winner: penWinner,
+        }).eq('id', m.id);
         if (error) return showToast(error.message);
       }
     }
@@ -490,7 +508,10 @@ const handleRegister = async () => {
                 {(nextRound.matches||[]).map(m => (
                   <div key={m.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid var(--surface3)'}}>
                     <div style={{display:'flex',alignItems:'center',gap:6}}><span style={{fontSize:22}}>{flag(m.home_team)}</span><span style={{fontSize:12,fontWeight:600,color:'var(--text-dim)'}}>{m.home_team}</span></div>
-                    <span style={{fontFamily:"'Bebas Neue',sans-serif",color:'var(--text-muted)',fontSize:14}}>VS</span>
+                    <div style={{display:'flex',flexDirection:'column',alignItems:'center'}}>
+                      <span style={{fontFamily:"'Bebas Neue',sans-serif",color:'var(--text-muted)',fontSize:14}}>VS</span>
+                      {m.is_knockout && <span style={{fontSize:8,color:'var(--gold)',fontWeight:800,letterSpacing:1}}>🏆ELIM</span>}
+                    </div>
                     <div style={{display:'flex',alignItems:'center',gap:6}}><span style={{fontSize:12,fontWeight:600,color:'var(--text-dim)'}}>{m.away_team}</span><span style={{fontSize:22}}>{flag(m.away_team)}</span></div>
                   </div>
                 ))}
@@ -600,7 +621,7 @@ const handleRegister = async () => {
         roundStats[p.id].participated = true;
         const pts = calcPoints(b, m);
         roundStats[p.id].pts += pts;
-        if (pts===4) roundStats[p.id].exact++;
+        if (pts>=4) roundStats[p.id].exact++;
       });
     });
     const sortedPlayers = [...players].sort((a,b) => roundStats[b.id].pts - roundStats[a.id].pts);
@@ -620,7 +641,8 @@ const handleRegister = async () => {
             <div className="mt">
               <div className="mte home"><div className="mfl">{flag(m.home_team)}</div><div className="mn">{m.home_team}</div></div>
               <div className="msb">
-                {m.played ? <div className="ms">{m.home_score}<span style={{color:'var(--text-muted)',marginInline:2}}>·</span>{m.away_score}</div> : <div className="mvs">VS</div>}
+                {m.is_knockout && <div style={{fontSize:9,color:'var(--gold)',fontWeight:800,letterSpacing:1,textAlign:'center',marginBottom:2}}>🏆ELIM</div>}
+                {m.played ? <div style={{textAlign:'center'}}><div className="ms">{m.home_score}<span style={{color:'var(--text-muted)',marginInline:2}}>·</span>{m.away_score}</div>{m.penalty_winner&&<div style={{fontSize:9,color:'var(--gold)',fontWeight:800,letterSpacing:0.5,marginTop:2}}>🥅 {flag(m.penalty_winner)}{m.penalty_winner}</div>}</div> : <div className="mvs">VS</div>}
               </div>
               <div className="mte away"><div className="mfl">{flag(m.away_team)}</div><div className="mn">{m.away_team}</div></div>
             </div>
@@ -668,7 +690,13 @@ const handleRegister = async () => {
                           const pts = b ? calcPoints(b, m) : null;
                           return (
                             <td key={m.id}>
-                              {b ? <span className={`bts${pts===4?' ex':pts===2?' si':''}`}>{b.home_bet}-{b.away_bet}</span> : <span style={{color:'var(--text-muted)'}}>—</span>}
+                              {b ? (
+                                <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:1}}>
+                                  <span className={`bts${pts>=6?' ex':pts===4?' ex':pts===2?' si':''}`}>{b.home_bet}-{b.away_bet}</span>
+                                  {b.penalty_winner && <span style={{fontSize:8,color:'var(--gold)'}}>🥅{flag(b.penalty_winner)}</span>}
+                                  {pts===6 && <span style={{fontSize:8,color:'var(--gold)',fontWeight:800}}>+6</span>}
+                                </div>
+                              ) : <span style={{color:'var(--text-muted)'}}>—</span>}
                             </td>
                           );
                         })}
@@ -679,7 +707,7 @@ const handleRegister = async () => {
                 </tbody>
               </table>
             </div>
-            <div style={{fontSize:11,color:'var(--text-muted)',textAlign:'center',marginBottom:12}}>🟡 Exacto +4 · 🟢 Signo +2</div>
+            <div style={{fontSize:11,color:'var(--text-muted)',textAlign:'center',marginBottom:12}}>🟡 Exacto +4 · 🟢 Signo +2 · 🏆 Signo+Pen +4 · Exacto+Pen +6</div>
           </>
         )}
       </>
@@ -716,15 +744,18 @@ const handleRegister = async () => {
                     <div className="mt">
                       <div className="mte home"><div className="mfl">{flag(m.home_team)}</div><div className="mn">{m.home_team}</div></div>
                       <div className="msb">
-                        {m.played ? <div className="ms">{m.home_score}<span style={{color:'var(--text-muted)',marginInline:2}}>·</span>{m.away_score}</div> : <div className="mvs">VS</div>}
+                        {m.is_knockout && !m.played && <div style={{fontSize:8,color:'var(--gold)',fontWeight:800,letterSpacing:1,textAlign:'center',marginBottom:2}}>🏆ELIM</div>}
+                        {m.played ? <div style={{textAlign:'center'}}>{m.is_knockout&&<div style={{fontSize:8,color:'var(--gold)',fontWeight:800,letterSpacing:1,marginBottom:2}}>🏆</div>}<div className="ms">{m.home_score}<span style={{color:'var(--text-muted)',marginInline:2}}>·</span>{m.away_score}</div>{m.penalty_winner&&<div style={{fontSize:9,color:'var(--gold)',fontWeight:800,marginTop:2}}>🥅{flag(m.penalty_winner)}</div>}</div> : <div className="mvs">VS</div>}
                       </div>
                       <div className="mte away"><div className="mfl">{flag(m.away_team)}</div><div className="mn">{m.away_team}</div></div>
                     </div>
                     {b && (
                       <div style={{marginTop:8,display:'flex',alignItems:'center',justifyContent:'center',gap:8,flexWrap:'wrap'}}>
                         <span style={{fontSize:11,color:'var(--text-muted)'}}>Mi porra:</span>
-                        <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:18,color:pts===4?'var(--gold)':pts===2?'var(--lime)':'var(--text-dim)'}}>{b.home_bet} – {b.away_bet}</span>
-                        {pts===4 && <span className="pill pe">🎯 EXACTO +4</span>}
+                        <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:18,color:pts===6?'var(--gold)':pts===4?'var(--gold)':pts===2?'var(--lime)':'var(--text-dim)'}}>{b.home_bet} – {b.away_bet}</span>
+                        {b.penalty_winner && <span style={{fontSize:11,color:'var(--gold)'}}>🥅 {flag(b.penalty_winner)}{b.penalty_winner}</span>}
+                        {pts===6 && <span className="pill pe">🏆 EXACTO+PEN +6</span>}
+                        {pts===4 && pts<6 && <span className="pill pe">🎯 EXACTO +4</span>}
                         {pts===2 && <span className="pill psi">✅ SIGNO +2</span>}
                         {pts===1 && <span className="pill pm">❌ FALLO +1</span>}
                       </div>
@@ -816,10 +847,12 @@ const handleRegister = async () => {
                 return (
                   <div key={b.id} style={{display:'flex',alignItems:'center',gap:8,marginBottom:4,fontSize:13}}>
                     <span>{flag(m.home_team)}</span>
-                    <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:16,color:pts===4?'var(--gold)':pts===2?'var(--lime)':'var(--text-dim)'}}>{b.home_bet}–{b.away_bet}</span>
+                    <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:16,color:pts>=4?'var(--gold)':pts===2?'var(--lime)':'var(--text-dim)'}}>{b.home_bet}–{b.away_bet}</span>
+                    {b.penalty_winner && <span style={{fontSize:10,color:'var(--gold)'}}>🥅{flag(b.penalty_winner)}</span>}
                     <span>{flag(m.away_team)}</span>
                     <span style={{flex:1,fontSize:11,color:'var(--text-dim)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.home_team} vs {m.away_team}</span>
-                    {pts===4 && <span className="pill pe" style={{fontSize:10}}>🎯+4</span>}
+                    {pts===6 && <span className="pill pe" style={{fontSize:10}}>🏆+6</span>}
+                    {pts===4 && pts<6 && <span className="pill pe" style={{fontSize:10}}>🎯+4</span>}
                     {pts===2 && <span className="pill psi" style={{fontSize:10}}>✅+2</span>}
                     {pts===1 && <span className="pill pm" style={{fontSize:10}}>❌+1</span>}
                   </div>
@@ -870,6 +903,7 @@ const handleRegister = async () => {
                   <span style={{color:'var(--text-muted)',fontSize:11,fontWeight:700}}>VS</span>
                   <span style={{fontSize:12,fontWeight:600,flex:1,textAlign:'right'}}>{m.away}</span>
                   <span style={{fontSize:18}}>{flag(m.away)}</span>
+                  {m.is_knockout && <span style={{fontSize:10,background:'var(--gold-dim)',color:'var(--gold)',padding:'2px 6px',borderRadius:4,fontWeight:700}}>🏆</span>}
                   <button style={{width:24,height:24,borderRadius:'50%',border:'1px solid var(--red-border)',background:'var(--red-bg)',color:'#f87171',cursor:'pointer',fontSize:14,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={()=>setNewRoundMatches(newRoundMatches.filter((_,j)=>j!==i))}>×</button>
                 </div>
               ))}
@@ -877,7 +911,11 @@ const handleRegister = async () => {
                 <div><label className="fl" style={{fontSize:10}}>Local</label><select className="fs" value={newMatchHome} onChange={e=>setNewMatchHome(e.target.value)}>{ALL_COUNTRIES.map(c=><option key={c} value={c}>{flag(c)} {c}</option>)}</select></div>
                 <div><label className="fl" style={{fontSize:10}}>Visitante</label><select className="fs" value={newMatchAway} onChange={e=>setNewMatchAway(e.target.value)}>{ALL_COUNTRIES.map(c=><option key={c} value={c}>{flag(c)} {c}</option>)}</select></div>
               </div>
-              <button className="btn2" style={{width:'100%',marginBottom:10}} onClick={() => { if(newMatchHome===newMatchAway) return showToast('Elige equipos distintos'); setNewRoundMatches([...newRoundMatches,{home:newMatchHome,away:newMatchAway}]); }}>+ Añadir partido</button>
+              <label style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,cursor:'pointer',fontSize:13,color:'var(--text-dim)'}}>
+                <input type="checkbox" checked={newMatchKnockout} onChange={e=>setNewMatchKnockout(e.target.checked)} style={{width:16,height:16,accentColor:'var(--gold)'}}/>
+                <span>🏆 Eliminatoria <span style={{color:'var(--text-muted)',fontSize:11}}>(puede ir a penaltis si empate)</span></span>
+              </label>
+              <button className="btn2" style={{width:'100%',marginBottom:10}} onClick={() => { if(newMatchHome===newMatchAway) return showToast('Elige equipos distintos'); setNewRoundMatches([...newRoundMatches,{home:newMatchHome,away:newMatchAway,is_knockout:newMatchKnockout}]); setNewMatchKnockout(false); }}>+ Añadir partido</button>
               <button className="btn" onClick={handleAddRound}>✅ Crear jornada</button>
             </div>
             <div className="sec">JORNADAS</div>
@@ -925,11 +963,17 @@ const handleRegister = async () => {
                 {(r.matches||[]).map(m => {
                   const dr = resultsDraft[m.id] || {home:0,away:0};
                   const setDr = (side,val) => setResultsDraft({...resultsDraft,[m.id]:{...dr,[side]:Math.max(0,val)}});
+                  const setDrPenalty = (team) => setResultsDraft({...resultsDraft,[m.id]:{...dr,penalty_winner:team}});
+                  const drIsDraw = (dr.home||0) === (dr.away||0);
+                  const showAdminPenalty = m.is_knockout && drIsDraw;
                   return (
                     <div key={m.id} style={{marginBottom:14,padding:'12px',background:'var(--surface3)',borderRadius:8}}>
                       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
                         <div style={{display:'flex',alignItems:'center',gap:6,fontSize:13,fontWeight:600}}><span style={{fontSize:24}}>{flag(m.home_team)}</span>{m.home_team}</div>
-                        <span style={{color:'var(--text-muted)',fontWeight:700}}>VS</span>
+                        <div style={{display:'flex',flexDirection:'column',alignItems:'center'}}>
+                          <span style={{color:'var(--text-muted)',fontWeight:700}}>VS</span>
+                          {m.is_knockout && <span style={{fontSize:9,color:'var(--gold)',fontWeight:800,letterSpacing:1}}>🏆ELIM</span>}
+                        </div>
                         <div style={{display:'flex',alignItems:'center',gap:6,fontSize:13,fontWeight:600}}>{m.away_team}<span style={{fontSize:24}}>{flag(m.away_team)}</span></div>
                       </div>
                       <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:12}}>
@@ -945,17 +989,33 @@ const handleRegister = async () => {
                           <button className="stb" onClick={()=>setDr('away',(dr.away||0)+1)}>+</button>
                         </div>
                       </div>
+                      {showAdminPenalty && (
+                        <div style={{marginTop:10,padding:'10px',background:'rgba(245,197,24,0.08)',borderRadius:8,border:'1px solid var(--gold-dim)'}}>
+                          <div style={{fontSize:10,fontWeight:800,letterSpacing:1,color:'var(--gold)',marginBottom:8,textAlign:'center'}}>🥅 GANADOR EN PENALTIS</div>
+                          <div style={{display:'flex',gap:8}}>
+                            <button onClick={()=>setDrPenalty(m.home_team)} style={{flex:1,padding:'7px 4px',borderRadius:8,border:`2px solid ${dr.penalty_winner===m.home_team?'var(--gold)':'var(--border)'}`,background:dr.penalty_winner===m.home_team?'rgba(245,197,24,0.15)':'var(--surface2)',color:dr.penalty_winner===m.home_team?'var(--gold)':'var(--text-dim)',cursor:'pointer',fontSize:11,fontWeight:700}}>
+                              {flag(m.home_team)} {m.home_team}
+                            </button>
+                            <button onClick={()=>setDrPenalty(m.away_team)} style={{flex:1,padding:'7px 4px',borderRadius:8,border:`2px solid ${dr.penalty_winner===m.away_team?'var(--gold)':'var(--border)'}`,background:dr.penalty_winner===m.away_team?'rgba(245,197,24,0.15)':'var(--surface2)',color:dr.penalty_winner===m.away_team?'var(--gold)':'var(--text-dim)',cursor:'pointer',fontSize:11,fontWeight:700}}>
+                              {flag(m.away_team)} {m.away_team}
+                            </button>
+                          </div>
+                        </div>
+                      )}
                       <div style={{marginTop:10,borderTop:'1px solid var(--border)',paddingTop:8}}>
                         <div style={{fontSize:10,color:'var(--text-muted)',marginBottom:6,fontWeight:700,letterSpacing:1}}>PREVIEW PUNTOS</div>
                         {players.filter(p=>bets.some(b=>b.player_id===p.id&&b.match_id===m.id)).map(p => {
                           const b = bets.find(b2=>b2.player_id===p.id&&b2.match_id===m.id);
-                          const pts = calcPoints(b, {home_score:dr.home||0,away_score:dr.away||0});
+                          const fakeMatch = {home_score:dr.home||0,away_score:dr.away||0,is_knockout:m.is_knockout,penalty_winner:showAdminPenalty?dr.penalty_winner:null};
+                          const pts = calcPoints(b, fakeMatch);
+                          const bd = calcPointsBreakdown(b, fakeMatch);
                           return (
                             <div key={p.id} style={{display:'flex',alignItems:'center',gap:6,marginBottom:3,fontSize:12}}>
                               <span>{p.avatar}</span>
                               <span style={{flex:1,fontWeight:600}}>{p.name}</span>
-                              <span style={{color:'var(--text-dim)'}}>{b.home_bet}–{b.away_bet}</span>
-                              {pts===4&&<span className="pill pe" style={{fontSize:10}}>🎯+4</span>}
+                              <span style={{color:'var(--text-dim)'}}>{b.home_bet}–{b.away_bet}{b.penalty_winner?<span style={{color:'var(--gold)',fontSize:10}}> 🥅{flag(b.penalty_winner)}</span>:null}</span>
+                              {pts===6&&<span className="pill pe" style={{fontSize:10}}>🏆+6</span>}
+                              {pts===4&&pts<6&&<span className="pill pe" style={{fontSize:10}}>🎯+4</span>}
                               {pts===2&&<span className="pill psi" style={{fontSize:10}}>✅+2</span>}
                               {pts===1&&<span className="pill pm" style={{fontSize:10}}>❌+1</span>}
                             </div>
@@ -997,21 +1057,29 @@ const handleRegister = async () => {
     if (!round) return null;
     const allFilled = (round.matches||[]).every(m => betDraft[m.id] && betDraft[m.id].home !== undefined && betDraft[m.id].away !== undefined);
     const setScore = (matchId, side, val) => setBetDraft({...betDraft, [matchId]: {...(betDraft[matchId]||{}), [side]: Math.max(0,val)}});
+    const setPenalty = (matchId, team) => setPenaltyDraft(prev => ({...prev, [matchId]: team}));
+    const hasKnockout = (round.matches||[]).some(m => m.is_knockout);
     return (
       <div className="ov" onClick={e => e.target===e.currentTarget && setModal(null)}>
         <div className="modal">
           <div className="mhdl"/>
           <div className="mtit">⚽ {round.name} — Tu porra</div>
           <div style={{fontSize:12,color:'var(--text-dim)',marginBottom:10}}>Cierra: {new Date(round.start_time).toLocaleString('es-ES',{weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
-          <div style={{fontSize:11,color:'var(--text-muted)',marginBottom:14,background:'var(--surface2)',padding:'8px 12px',borderRadius:8}}>🎯 Exacto +4 · ✅ Signo 1X2 +2 · Participas +1</div>
+          <div style={{fontSize:11,color:'var(--text-muted)',marginBottom:14,background:'var(--surface2)',padding:'8px 12px',borderRadius:8}}>
+            🎯 Exacto +4 · ✅ Signo 1X2 +2 · Participas +1
+            {hasKnockout && <span> · 🏆 Signo+Penaltis +4 · Exacto+Penaltis +6</span>}
+          </div>
           {(round.matches||[]).map(m => {
             const hVal = betDraft[m.id]?.home;
             const aVal = betDraft[m.id]?.away;
+            const isDraw = hVal !== undefined && aVal !== undefined && hVal === aVal;
+            const showPenalty = m.is_knockout && isDraw;
+            const selPenalty = penaltyDraft[m.id];
             return (
               <div key={m.id} className="mc" style={{marginBottom:10}}>
                 <div className="mt">
                   <div className="mte home"><div className="mfl">{flag(m.home_team)}</div><div className="mn">{m.home_team}</div></div>
-                  <div className="mvs">VS</div>
+                  {m.is_knockout ? <div style={{display:'flex',flexDirection:'column',alignItems:'center'}}><div className="mvs">VS</div><span style={{fontSize:9,color:'var(--gold)',fontWeight:800,letterSpacing:1}}>🏆ELIM</span></div> : <div className="mvs">VS</div>}
                   <div className="mte away"><div className="mfl">{flag(m.away_team)}</div><div className="mn">{m.away_team}</div></div>
                 </div>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:16,marginTop:12,paddingTop:12,borderTop:'1px solid var(--border)'}}>
@@ -1027,6 +1095,20 @@ const handleRegister = async () => {
                     <button className="stb" onClick={()=>setScore(m.id,'away',(aVal||0)+1)}>+</button>
                   </div>
                 </div>
+                {showPenalty && (
+                  <div style={{marginTop:10,padding:'10px',background:'rgba(245,197,24,0.08)',borderRadius:8,border:'1px solid var(--gold-dim)'}}>
+                    <div style={{fontSize:10,fontWeight:800,letterSpacing:1,color:'var(--gold)',marginBottom:8,textAlign:'center'}}>🥅 ¿QUIÉN GANA EN PENALTIS?</div>
+                    <div style={{display:'flex',gap:8}}>
+                      <button onClick={()=>setPenalty(m.id, m.home_team)} style={{flex:1,padding:'8px 4px',borderRadius:8,border:`2px solid ${selPenalty===m.home_team?'var(--gold)':'var(--border)'}`,background:selPenalty===m.home_team?'rgba(245,197,24,0.15)':'var(--surface3)',color:selPenalty===m.home_team?'var(--gold)':'var(--text-dim)',cursor:'pointer',fontSize:12,fontWeight:700,transition:'all .15s'}}>
+                        {flag(m.home_team)} {m.home_team}
+                      </button>
+                      <button onClick={()=>setPenalty(m.id, m.away_team)} style={{flex:1,padding:'8px 4px',borderRadius:8,border:`2px solid ${selPenalty===m.away_team?'var(--gold)':'var(--border)'}`,background:selPenalty===m.away_team?'rgba(245,197,24,0.15)':'var(--surface3)',color:selPenalty===m.away_team?'var(--gold)':'var(--text-dim)',cursor:'pointer',fontSize:12,fontWeight:700,transition:'all .15s'}}>
+                        {flag(m.away_team)} {m.away_team}
+                      </button>
+                    </div>
+                    {!selPenalty && <div style={{fontSize:10,color:'var(--text-muted)',marginTop:6,textAlign:'center'}}>Opcional — +2 pts si aciertas</div>}
+                  </div>
+                )}
               </div>
             );
           })}
