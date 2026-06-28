@@ -224,6 +224,7 @@ export default function App() {
   const [newMatchAway, setNewMatchAway] = useState('Alemania');
   const [adminTab, setAdminTab] = useState('rounds');
   const toastTimer = useRef(null);
+  const [savingBet, setSavingBet] = useState(false);
 
   // ── LOAD DATA ──────────────────────────────────────────────────────────────
   const loadAll = useCallback(async (quiet = false) => {
@@ -339,8 +340,10 @@ const handleRegister = async () => {
     } else showToast('Contraseña incorrecta');
   };
 
-  const handleSaveBet = async () => {
+    const handleSaveBet = async () => {
     if (!currentPlayer || !selectedRoundId) return;
+    if (savingBet) return;
+    setSavingBet(true);
     const round = rounds.find(r => r.id === selectedRoundId);
     if (!round || !isOpen(round)) return showToast('La jornada ya está cerrada');
     const allFilled = round.matches.every(m => betDraft[m.id] !== undefined && betDraft[m.id].home !== undefined && betDraft[m.id].away !== undefined);
@@ -350,8 +353,9 @@ const handleRegister = async () => {
       match_id: m.id, home_bet: betDraft[m.id].home, away_bet: betDraft[m.id].away,
     }));
     const { error } = await supabase.from('bets').insert(rows);
-    if (error) return showToast(error.message);
+    if (error && !error.message.includes('duplicate')) return showToast(error.message);
     await loadAll(true); setModal(null); boom(); showToast('✅ ¡Porra guardada!');
+    setSavingBet(false);
   };
 
   const handleAddRound = async () => {
@@ -1028,7 +1032,9 @@ const handleRegister = async () => {
           })}
           <div style={{display:'flex',gap:8,marginTop:4}}>
             <button className="btn2" style={{flexShrink:0}} onClick={()=>setModal(null)}>Cancelar</button>
-            <button className="btn" onClick={handleSaveBet} disabled={!allFilled}>{allFilled ? '✅ Guardar porra' : 'Rellena todos'}</button>
+            <button className="btn" onClick={handleSaveBet} disabled={!allFilled || savingBet}>
+            {savingBet ? 'Guardando...' : allFilled ? '✅ Guardar porra' : 'Rellena todos'}
+            </button>
           </div>
         </div>
       </div>
