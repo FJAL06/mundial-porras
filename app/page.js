@@ -237,11 +237,12 @@ export default function App() {
         supabase.from('players').select('*').order('created_at'),
         supabase.from('rounds').select('*').order('created_at'),
         supabase.from('matches').select('*').order('position'),
-        supabase.from('bets').select('*'),
+        supabase.from('bets').select('*').limit(5000),
       ]);
       setPlayers(ps || []);
       setRounds((rs || []).map(r => ({...r, matches: (ms || []).filter(m => m.round_id === r.id)})));
       setBets(bs || []);
+      console.log(`loadAll: ${(ps||[]).length} players, ${(bs||[]).length} bets, ${(ms||[]).length} matches`);
     } catch {}
     setLoading(false);
     setRefreshing(false);
