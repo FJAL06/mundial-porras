@@ -233,16 +233,26 @@ export default function App() {
     if (!quiet) setLoading(true);
     else setRefreshing(true);
     try {
-      const [{ data: ps }, { data: rs }, { data: ms }, { data: bs }] = await Promise.all([
+      const [{ data: ps }, { data: rs }, { data: ms }] = await Promise.all([
         supabase.from('players').select('*').order('created_at'),
         supabase.from('rounds').select('*').order('created_at'),
         supabase.from('matches').select('*').order('position'),
-        supabase.from('bets').select('*').limit(5000),
       ]);
+      // Traer apuestas paginadas de 1000 en 1000 hasta tenerlas todas
+      let allBets = [];
+      let from = 0;
+      const PAGE = 1000;
+      while (true) {
+        const { data: page } = await supabase.from('bets').select('*').range(from, from + PAGE - 1);
+        if (!page || page.length === 0) break;
+        allBets = allBets.concat(page);
+        if (page.length < PAGE) break;
+        from += PAGE;
+      }
       setPlayers(ps || []);
       setRounds((rs || []).map(r => ({...r, matches: (ms || []).filter(m => m.round_id === r.id)})));
-      setBets(bs || []);
-      console.log(`loadAll: ${(ps||[]).length} players, ${(bs||[]).length} bets, ${(ms||[]).length} matches`);
+      setBets(allBets);
+      console.log(`loadAll: ${(ps||[]).length} players, ${allBets.length} bets, ${(ms||[]).length} matches`);
     } catch {}
     setLoading(false);
     setRefreshing(false);
