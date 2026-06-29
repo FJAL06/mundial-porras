@@ -361,8 +361,18 @@ const handleRegister = async () => {
         penalty_winner: penWinner,
       };
     });
-    const { error } = await supabase.from('bets').upsert(rows, { onConflict: 'player_id,match_id' });
-    if (error && !error.message.includes('duplicate')) return showToast(error.message);
+    // Borrar porras anteriores de este jugador en esta jornada, luego insertar de nuevo
+    const matchIds = rows.map(r => r.match_id);
+    const { error: delError } = await supabase.from('bets')
+      .delete()
+      .eq('player_id', currentPlayer.id)
+      .eq('round_id', round.id)
+      .in('match_id', matchIds);
+    console.log('DELETE result:', delError);
+    if (delError) { setSavingBet(false); return showToast('Error al limpiar porra anterior: ' + delError.message); }
+    const { error, data } = await supabase.from('bets').insert(rows).select();
+    console.log('INSERT result:', JSON.stringify({ error, data, rows }));
+    if (error) { setSavingBet(false); return showToast('Error: ' + error.message); }
     await loadAll(true); setModal(null); boom(); showToast('✅ ¡Porra guardada!');
     setSavingBet(false);
   };
