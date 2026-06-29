@@ -361,7 +361,7 @@ const handleRegister = async () => {
         penalty_winner: penWinner,
       };
     });
-    const { error } = await supabase.from('bets').insert(rows);
+    const { error } = await supabase.from('bets').upsert(rows, { onConflict: 'player_id,match_id' });
     if (error && !error.message.includes('duplicate')) return showToast(error.message);
     await loadAll(true); setModal(null); boom(); showToast('✅ ¡Porra guardada!');
     setSavingBet(false);
