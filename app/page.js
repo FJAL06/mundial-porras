@@ -449,10 +449,92 @@ const handleRegister = async () => {
 
   // ── LOADING SCREEN ─────────────────────────────────────────────────────────
   if (loading) return (
-    <div style={{height:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#060f0a',flexDirection:'column',gap:12}}>
+    <div style={{height:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'radial-gradient(circle at 50% 30%, #0d2818 0%, #060f0a 70%)',flexDirection:'column',gap:8,overflow:'hidden',position:'relative'}}>
       <style>{css}</style>
-      <div style={{fontSize:54}}>⚽</div>
-      <div style={{fontFamily:'sans-serif',fontSize:20,color:'#f5c518',letterSpacing:3}}>CARGANDO…</div>
+      <style>{`
+        @keyframes wcBounce {
+          0%   { transform: translateY(0) rotate(0deg); }
+          25%  { transform: translateY(-70px) rotate(180deg); }
+          50%  { transform: translateY(0) rotate(360deg); }
+          60%  { transform: translateY(0) rotate(360deg) scaleX(1.15) scaleY(0.85); }
+          70%  { transform: translateY(-20px) rotate(420deg) scaleX(1) scaleY(1); }
+          100% { transform: translateY(0) rotate(540deg); }
+        }
+        @keyframes wcShadow {
+          0%,100% { transform: scaleX(1); opacity: .35; }
+          25%,75% { transform: scaleX(.5); opacity: .12; }
+          50%     { transform: scaleX(1); opacity: .35; }
+        }
+        @keyframes wcGlow {
+          0%,100% { text-shadow: 0 0 12px rgba(245,197,24,.5), 0 0 24px rgba(245,197,24,.25); }
+          50%     { text-shadow: 0 0 24px rgba(245,197,24,.9), 0 0 48px rgba(245,197,24,.5); }
+        }
+        @keyframes wcDots {
+          0%,20%  { opacity: 0; }
+          50%     { opacity: 1; }
+          100%    { opacity: 0; }
+        }
+        @keyframes wcFlagSpin {
+          0%   { transform: rotateY(0deg); }
+          100% { transform: rotateY(360deg); }
+        }
+        @keyframes wcFloat {
+          0%,100% { transform: translateY(0); }
+          50%     { transform: translateY(-8px); }
+        }
+        @keyframes wcBarFill {
+          0%   { width: 0%; }
+          50%  { width: 75%; }
+          100% { width: 100%; }
+        }
+        @keyframes wcConfetti {
+          0%   { transform: translateY(-20px) rotate(0deg); opacity: 0; }
+          10%  { opacity: 1; }
+          100% { transform: translateY(420px) rotate(540deg); opacity: 0; }
+        }
+        .wc-confetti span {
+          position: absolute; top: 0; font-size: 14px;
+          animation: wcConfetti 3.2s linear infinite;
+        }
+      `}</style>
+
+      <div className="wc-confetti" style={{position:'absolute',inset:0,pointerEvents:'none'}}>
+        <span style={{left:'8%',animationDelay:'0s'}}>🎉</span>
+        <span style={{left:'22%',animationDelay:'.6s'}}>⚽</span>
+        <span style={{left:'40%',animationDelay:'1.3s'}}>🏆</span>
+        <span style={{left:'58%',animationDelay:'.3s'}}>🎊</span>
+        <span style={{left:'74%',animationDelay:'1.8s'}}>⚽</span>
+        <span style={{left:'90%',animationDelay:'.9s'}}>🥅</span>
+      </div>
+
+      <div style={{display:'flex',gap:14,marginBottom:6,animation:'wcFloat 2.4s ease-in-out infinite'}}>
+        <span style={{fontSize:26}}>🇪🇸</span>
+        <span style={{fontSize:26,animationDelay:'.3s'}}>🇧🇷</span>
+        <span style={{fontSize:26,animationDelay:'.6s'}}>🇩🇪</span>
+        <span style={{fontSize:26,animationDelay:'.9s'}}>🇦🇷</span>
+      </div>
+
+      <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:30,letterSpacing:4,color:'#f5c518',animation:'wcGlow 1.6s ease-in-out infinite',marginBottom:18}}>
+        🏆 MUNDIAL PORRAS
+      </div>
+
+      <div style={{position:'relative',width:90,height:120,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end'}}>
+        <div style={{fontSize:48,animation:'wcBounce 1.1s cubic-bezier(.5,0,.5,1) infinite'}}>⚽</div>
+        <div style={{width:54,height:10,borderRadius:'50%',background:'#000',animation:'wcShadow 1.1s ease-in-out infinite',marginTop:4}}/>
+      </div>
+
+      <div style={{fontFamily:'sans-serif',fontSize:16,color:'#f5c518',letterSpacing:3,marginTop:22,display:'flex',alignItems:'center',gap:2}}>
+        CARGANDO
+        <span style={{display:'inline-flex'}}>
+          <span style={{animation:'wcDots 1.4s infinite',animationDelay:'0s'}}>.</span>
+          <span style={{animation:'wcDots 1.4s infinite',animationDelay:'.2s'}}>.</span>
+          <span style={{animation:'wcDots 1.4s infinite',animationDelay:'.4s'}}>.</span>
+        </span>
+      </div>
+
+      <div style={{width:160,height:5,background:'rgba(255,255,255,.08)',borderRadius:99,marginTop:14,overflow:'hidden'}}>
+        <div style={{height:'100%',background:'linear-gradient(90deg,#f5c518,#ffe27a)',borderRadius:99,animation:'wcBarFill 1.8s ease-in-out infinite'}}/>
+      </div>
     </div>
   );
 
