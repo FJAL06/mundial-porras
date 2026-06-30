@@ -206,7 +206,7 @@ export default function App() {
   const [bets, setBets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [showIntro, setShowIntro] = useState(!sessionStorage.getItem('wp_intro_seen'));
+  const [showIntro, setShowIntro] = useState(false); // se activa en useEffect
   const [currentPlayer, setCurrentPlayer] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
@@ -260,7 +260,14 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    loadAll();
+    const isFirstVisit = typeof sessionStorage !== 'undefined' && !sessionStorage.getItem('wp_intro_seen');
+    loadAll().then(() => {
+      if (isFirstVisit) {
+        setShowIntro(true);
+        sessionStorage.setItem('wp_intro_seen', '1');
+        setTimeout(() => setShowIntro(false), 3200);
+      }
+    });
     // Restore session
     try {
       const p = localStorage.getItem('mundial_player');
@@ -541,7 +548,6 @@ const handleRegister = async () => {
 
   // ── INTRO SCREEN ───────────────────────────────────────────────────────────
   if (showIntro) {
-    setTimeout(() => { sessionStorage.setItem('wp_intro_seen','1'); setShowIntro(false); }, 3200);
     return (
       <div style={{position:'fixed',inset:0,background:'#060f0a',zIndex:9999,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
         <style>{css}</style>
