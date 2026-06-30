@@ -206,6 +206,7 @@ export default function App() {
   const [bets, setBets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showIntro, setShowIntro] = useState(!sessionStorage.getItem('wp_intro_seen'));
   const [currentPlayer, setCurrentPlayer] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
@@ -537,6 +538,166 @@ const handleRegister = async () => {
       </div>
     </div>
   );
+
+  // ── INTRO SCREEN ───────────────────────────────────────────────────────────
+  if (showIntro) {
+    setTimeout(() => { sessionStorage.setItem('wp_intro_seen','1'); setShowIntro(false); }, 3200);
+    return (
+      <div style={{position:'fixed',inset:0,background:'#060f0a',zIndex:9999,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
+        <style>{css}</style>
+        <style>{`
+          @keyframes introBg {
+            0%   { opacity:0; transform:scale(1.08); }
+            100% { opacity:1; transform:scale(1); }
+          }
+          @keyframes introFadeOut {
+            0%,75% { opacity:1; }
+            100%   { opacity:0; }
+          }
+          @keyframes introGrassSlide {
+            0%   { transform:translateY(100%); }
+            40%  { transform:translateY(0%); }
+            85%  { transform:translateY(0%); }
+            100% { transform:translateY(-100%); }
+          }
+          @keyframes introBallDrop {
+            0%   { transform:translateY(-160px) rotate(0deg); opacity:0; }
+            30%  { opacity:1; }
+            50%  { transform:translateY(0px) rotate(320deg); }
+            58%  { transform:translateY(-22px) rotate(370deg) scaleY(1); }
+            64%  { transform:translateY(0px) rotate(400deg) scaleX(1.2) scaleY(0.8); }
+            70%  { transform:translateY(-10px) rotate(430deg); }
+            76%  { transform:translateY(0px) rotate(450deg); }
+            85%  { transform:translateY(0px) rotate(450deg); opacity:1; }
+            100% { transform:translateY(-10px) rotate(450deg); opacity:0; }
+          }
+          @keyframes introShadowDrop {
+            0%   { transform:scaleX(0.1); opacity:0; }
+            50%  { transform:scaleX(1); opacity:0.4; }
+            58%  { transform:scaleX(1.3); opacity:0.2; }
+            64%  { transform:scaleX(0.8); opacity:0.5; }
+            76%  { transform:scaleX(1); opacity:0.4; }
+            85%  { transform:scaleX(1); opacity:0.4; }
+            100% { opacity:0; }
+          }
+          @keyframes introTitleIn {
+            0%   { opacity:0; transform:translateY(30px) scale(.9); letter-spacing:12px; }
+            100% { opacity:1; transform:translateY(0) scale(1); letter-spacing:4px; }
+          }
+          @keyframes introSubIn {
+            0%   { opacity:0; transform:translateY(16px); }
+            100% { opacity:1; transform:translateY(0); }
+          }
+          @keyframes introTrophyPulse {
+            0%,100% { transform:scale(1) rotate(-4deg); filter:drop-shadow(0 0 6px rgba(245,197,24,.4)); }
+            50%     { transform:scale(1.12) rotate(4deg); filter:drop-shadow(0 0 20px rgba(245,197,24,.9)); }
+          }
+          @keyframes introLineGrow {
+            0%   { transform:scaleX(0); }
+            100% { transform:scaleX(1); }
+          }
+          @keyframes introFlagWave {
+            0%   { opacity:0; transform:translateY(12px); }
+            100% { opacity:1; transform:translateY(0); }
+          }
+          @keyframes introFlare {
+            0%,100% { opacity:0; transform:scale(.6); }
+            50%     { opacity:.18; transform:scale(1); }
+          }
+          @keyframes introWholeFadeOut {
+            0%,80% { opacity:1; }
+            100%   { opacity:0; }
+          }
+          .intro-wrap {
+            animation: introWholeFadeOut 3.2s ease forwards;
+            width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative;
+          }
+          .intro-grass {
+            position:absolute; bottom:0; left:0; right:0; height:38%;
+            background:linear-gradient(180deg,#0d5229 0%,#0a3d1f 60%,#072e16 100%);
+            animation: introGrassSlide 3.2s cubic-bezier(.4,0,.2,1) forwards;
+          }
+          .intro-grass::before {
+            content:''; position:absolute; top:0; left:0; right:0; height:3px;
+            background:repeating-linear-gradient(90deg,#f5c518 0px,#f5c518 40px,transparent 40px,transparent 80px);
+            opacity:.35;
+          }
+          .intro-flare {
+            position:absolute; width:500px; height:500px; border-radius:50%;
+            background:radial-gradient(circle,rgba(245,197,24,.12) 0%,transparent 70%);
+            animation:introFlare 3.2s ease-in-out infinite;
+          }
+          .intro-ball {
+            font-size:72px; line-height:1;
+            animation:introBallDrop 3.2s cubic-bezier(.4,0,.2,1) forwards;
+            position:relative; z-index:2;
+          }
+          .intro-ball-shadow {
+            width:70px; height:12px; border-radius:50%;
+            background:rgba(0,0,0,.5);
+            margin-top:-4px; margin-bottom:24px;
+            animation:introShadowDrop 3.2s cubic-bezier(.4,0,.2,1) forwards;
+          }
+          .intro-trophy {
+            font-size:52px;
+            animation:introTrophyPulse 1.2s ease-in-out infinite, introSubIn .5s .9s ease both;
+            opacity:0;
+          }
+          .intro-title {
+            font-family:'Bebas Neue',sans-serif;
+            font-size:42px;
+            color:#f5c518;
+            animation:introTitleIn .7s .7s cubic-bezier(.2,0,0,1) both;
+            opacity:0;
+            text-align:center;
+            line-height:1;
+          }
+          .intro-title span { color:#e8f5ec; }
+          .intro-line {
+            width:180px; height:2px; border-radius:1px;
+            background:linear-gradient(90deg,transparent,#f5c518,transparent);
+            margin:10px auto;
+            animation:introLineGrow .6s .9s cubic-bezier(.4,0,.2,1) both;
+            transform-origin:center;
+          }
+          .intro-sub {
+            font-family:'Inter',sans-serif;
+            font-size:11px; font-weight:700; letter-spacing:4px;
+            color:#7da98a; text-transform:uppercase;
+            animation:introSubIn .5s 1s ease both; opacity:0;
+          }
+          .intro-flags {
+            display:flex; gap:10px; margin-top:18px;
+          }
+          .intro-flags span {
+            font-size:24px;
+            opacity:0;
+          }
+          .intro-flags span:nth-child(1){animation:introFlagWave .4s 1.2s ease both}
+          .intro-flags span:nth-child(2){animation:introFlagWave .4s 1.35s ease both}
+          .intro-flags span:nth-child(3){animation:introFlagWave .4s 1.5s ease both}
+          .intro-flags span:nth-child(4){animation:introFlagWave .4s 1.65s ease both}
+          .intro-flags span:nth-child(5){animation:introFlagWave .4s 1.8s ease both}
+          .intro-flags span:nth-child(6){animation:introFlagWave .4s 1.95s ease both}
+        `}</style>
+        <div className="intro-wrap">
+          <div className="intro-flare"/>
+          <div className="intro-grass"/>
+          <div style={{position:'relative',zIndex:3,display:'flex',flexDirection:'column',alignItems:'center'}}>
+            <div className="intro-ball">⚽</div>
+            <div className="intro-ball-shadow"/>
+            <div className="intro-trophy">🏆</div>
+            <div className="intro-title">MUNDIAL<br/><span>PORRAS</span></div>
+            <div className="intro-line"/>
+            <div className="intro-sub">WORLD CUP 2026</div>
+            <div className="intro-flags">
+              <span>🇪🇸</span><span>🇧🇷</span><span>🇩🇪</span><span>🇦🇷</span><span>🇫🇷</span><span>🇵🇹</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ── HOME ──────────────────────────────────────────────────────────────────
   const renderHome = () => {
