@@ -4,6 +4,9 @@ import { supabase } from '../lib/supabase';
 import { flag, calcPoints, calcPointsBreakdown, computeStandings, getRoundAwards, ALL_COUNTRIES, AVATAR_EMOJIS, ADMIN_PASSWORD } from '../lib/game';
 
 // ── CSS ───────────────────────────────────────────────────────────────────────
+const BALL_IMG = "/ball.png";
+const TROPHY_IMG = "/trophy.png";
+
 const css = `
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;900&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
@@ -695,9 +698,9 @@ const handleRegister = async () => {
           <div className="intro-flare"/>
           <div className="intro-grass"/>
           <div style={{position:'relative',zIndex:3,display:'flex',flexDirection:'column',alignItems:'center'}}>
-            <div className="intro-ball">⚽</div>
+            <div className="intro-ball"><img src={BALL_IMG} alt="ball" style={{width:100,height:100,objectFit:"contain",display:"block"}}/></div>
             <div className="intro-ball-shadow"/>
-            <div className="intro-trophy">🏆</div>
+            <div className="intro-trophy"><img src={TROPHY_IMG} alt="trophy" style={{width:110,height:"auto",objectFit:"contain",display:"block"}}/></div>
             <div className="intro-title">MUNDIAL<br/><span>PORRAS</span></div>
             <div className="intro-line"/>
             <div className="intro-sub">WORLD CUP 2026</div>
