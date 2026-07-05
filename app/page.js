@@ -226,6 +226,11 @@ export default function App() {
   const [newMatchAway, setNewMatchAway] = useState('Alemania');
   const [newMatchKnockout, setNewMatchKnockout] = useState(false);
   const [adminTab, setAdminTab] = useState('rounds');
+  const [adminBetRoundId, setAdminBetRoundId] = useState(null);
+  const [adminBetPlayerId, setAdminBetPlayerId] = useState(null);
+  const [adminBetDraft, setAdminBetDraft] = useState({});
+  const [adminBetPenaltyDraft, setAdminBetPenaltyDraft] = useState({});
+  const [savingAdminBet, setSavingAdminBet] = useState(false);
   const toastTimer = useRef(null);
   const [savingBet, setSavingBet] = useState(false);
 
@@ -1136,6 +1141,35 @@ const handleRegister = async () => {
     );
   };
 
+  // ── ADMIN SAVE BET ────────────────────────────────────────────────────────
+  const handleSaveAdminBet = async () => {
+    if (savingAdminBet) return;
+    const round = rounds.find(r => r.id === adminBetRoundId);
+    const player = players.find(p => p.id === adminBetPlayerId);
+    if (!round || !player) return;
+    const allFilled = (round.matches||[]).every(m => adminBetDraft[m.id]?.home !== undefined && adminBetDraft[m.id]?.away !== undefined);
+    if (!allFilled) return showToast('Rellena todos los marcadores');
+    setSavingAdminBet(true);
+    const rows = round.matches.map(m => {
+      const betH = adminBetDraft[m.id].home;
+      const betA = adminBetDraft[m.id].away;
+      const isDraw = betH === betA;
+      const penWinner = (m.is_knockout && isDraw) ? (adminBetPenaltyDraft[m.id] || null) : null;
+      return { player_id: player.id, round_id: round.id, match_id: m.id, home_bet: betH, away_bet: betA, penalty_winner: penWinner };
+    });
+    const matchIds = rows.map(r => r.match_id);
+    const { error: delError } = await supabase.from('bets').delete().eq('player_id', player.id).eq('round_id', round.id).in('match_id', matchIds);
+    if (delError) { setSavingAdminBet(false); return showToast('Error: ' + delError.message); }
+    const { error } = await supabase.from('bets').insert(rows);
+    if (error) { setSavingAdminBet(false); return showToast('Error: ' + error.message); }
+    await loadAll(true);
+    setSavingAdminBet(false);
+    setAdminBetPlayerId(null);
+    setAdminBetDraft({});
+    setAdminBetPenaltyDraft({});
+    showToast('✅ Porra de ' + player.name + ' guardada');
+  };
+
   // ── ADMIN ─────────────────────────────────────────────────────────────────
   const renderAdmin = () => {
     if (!isAdmin) return (
@@ -1154,7 +1188,7 @@ const handleRegister = async () => {
           </div>
         </div>
         <div className="tabs">
-          {[['rounds','📅 Jornadas'],['results','⚽ Resultados'],['players','👥 Jugadores']].map(([k,l]) => (
+          {[['rounds','📅 Jornadas'],['results','⚽ Resultados'],['bets','🖊️ Porras'],['players','👥 Jugadores']].map(([k,l]) => (
             <button key={k} className={`tab${adminTab===k?' active':''}`} onClick={() => setAdminTab(k)}>{l}</button>
           ))}
         </div>
@@ -1300,6 +1334,110 @@ const handleRegister = async () => {
             ))}
           </>
         )}
+
+        {adminTab === 'bets' && (() => {
+          const round = adminBetRoundId ? rounds.find(r => r.id === adminBetRoundId) : null;
+          const player = adminBetPlayerId ? players.find(p => p.id === adminBetPlayerId) : null;
+          return (
+            <>
+              <div className="sec">SELECCIONA JORNADA</div>
+              <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:16}}>
+                {rounds.map(r => (
+                  <button key={r.id} onClick={() => { setAdminBetRoundId(r.id); setAdminBetPlayerId(null); setAdminBetDraft({}); setAdminBetPenaltyDraft({}); }}
+                    style={{padding:'10px 14px',borderRadius:8,border:`2px solid ${adminBetRoundId===r.id?'var(--gold)':'var(--border)'}`,background:adminBetRoundId===r.id?'rgba(245,197,24,.1)':'var(--surface3)',color:adminBetRoundId===r.id?'var(--gold)':'var(--text)',cursor:'pointer',textAlign:'left',fontWeight:600,fontSize:13}}>
+                    {r.name} {r.closed&&<span style={{fontSize:10,color:'var(--text-muted)'}}>· cerrada</span>}
+                  </button>
+                ))}
+              </div>
+              {round && (<>
+                <div className="sec">SELECCIONA JUGADOR</div>
+                <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:16}}>
+                  {players.map(p => {
+                    const hasBet = bets.some(b => b.player_id===p.id && b.round_id===round.id);
+                    return (
+                      <button key={p.id} onClick={() => {
+                        setAdminBetPlayerId(p.id);
+                        // Pre-fill with existing bet if any
+                        const draft = {};
+                        const penDraft = {};
+                        round.matches.forEach(m => {
+                          const b = bets.find(b2 => b2.player_id===p.id && b2.match_id===m.id);
+                          if (b) { draft[m.id] = {home:b.home_bet, away:b.away_bet}; if(b.penalty_winner) penDraft[m.id]=b.penalty_winner; }
+                          else { draft[m.id] = {home:0, away:0}; }
+                        });
+                        setAdminBetDraft(draft);
+                        setAdminBetPenaltyDraft(penDraft);
+                      }}
+                        style={{padding:'10px 14px',borderRadius:8,border:`2px solid ${adminBetPlayerId===p.id?'var(--gold)':'var(--border)'}`,background:adminBetPlayerId===p.id?'rgba(245,197,24,.1)':'var(--surface3)',color:adminBetPlayerId===p.id?'var(--gold)':'var(--text)',cursor:'pointer',textAlign:'left',display:'flex',alignItems:'center',gap:10}}>
+                        <span style={{fontSize:22}}>{p.avatar}</span>
+                        <span style={{fontWeight:700,flex:1}}>{p.name}</span>
+                        {hasBet ? <span style={{fontSize:10,color:'var(--lime)',fontWeight:700}}>✅ Ya tiene porra</span> : <span style={{fontSize:10,color:'var(--text-muted)'}}>Sin porra</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>)}
+              {round && player && (<>
+                <div className="sec" style={{color:'var(--gold)'}}>✏️ EDITANDO PORRA DE {player.name.toUpperCase()}</div>
+                <div style={{fontSize:11,color:'var(--text-muted)',marginBottom:12,padding:'8px 12px',background:'var(--surface2)',borderRadius:8}}>
+                  Jornada: <b style={{color:'var(--text)'}}>{round.name}</b> {round.closed && <span style={{color:'#f87171'}}>· Jornada cerrada (edición manual de admin)</span>}
+                </div>
+                {round.matches.map(m => {
+                  const hVal = adminBetDraft[m.id]?.home;
+                  const aVal = adminBetDraft[m.id]?.away;
+                  const setScore = (side, val) => setAdminBetDraft(prev => ({...prev, [m.id]: {...(prev[m.id]||{}), [side]: Math.max(0,val)}}));
+                  const isDraw = hVal !== undefined && aVal !== undefined && hVal === aVal;
+                  const showPenalty = m.is_knockout && isDraw;
+                  const selPenalty = adminBetPenaltyDraft[m.id];
+                  // Preview points if match played
+                  const pts = m.played ? calcPoints({home_bet:hVal||0,away_bet:aVal||0,penalty_winner:selPenalty||null}, m) : null;
+                  return (
+                    <div key={m.id} className="mc" style={{marginBottom:10}}>
+                      <div className="mt">
+                        <div className="mte home"><div className="mfl">{flag(m.home_team)}</div><div className="mn">{m.home_team}</div></div>
+                        <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
+                          {m.played ? <div className="ms" style={{fontSize:16}}>{m.home_score}·{m.away_score}</div> : <div className="mvs">VS</div>}
+                          {pts!==null && <span style={{fontSize:10,fontWeight:800,color:pts>=4?'var(--gold)':pts===2?'var(--lime)':'#f87171'}}>{pts>=6?'🏆':pts>=4?'🎯':pts===2?'✅':'❌'}+{pts}</span>}
+                        </div>
+                        <div className="mte away"><div className="mfl">{flag(m.away_team)}</div><div className="mn">{m.away_team}</div></div>
+                      </div>
+                      <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:16,marginTop:12,paddingTop:12,borderTop:'1px solid var(--border)'}}>
+                        <div className="stpr">
+                          <button className="stb" onClick={()=>setScore('home',(hVal||0)-1)}>−</button>
+                          <span className="stv">{hVal!==undefined?hVal:0}</span>
+                          <button className="stb" onClick={()=>setScore('home',(hVal||0)+1)}>+</button>
+                        </div>
+                        <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:'var(--text-muted)'}}>–</span>
+                        <div className="stpr">
+                          <button className="stb" onClick={()=>setScore('away',(aVal||0)-1)}>−</button>
+                          <span className="stv">{aVal!==undefined?aVal:0}</span>
+                          <button className="stb" onClick={()=>setScore('away',(aVal||0)+1)}>+</button>
+                        </div>
+                      </div>
+                      {showPenalty && (
+                        <div style={{marginTop:10,padding:'10px',background:'rgba(245,197,24,0.08)',borderRadius:8,border:'1px solid var(--gold-dim)'}}>
+                          <div style={{fontSize:10,fontWeight:800,letterSpacing:1,color:'var(--gold)',marginBottom:8,textAlign:'center'}}>🥅 ¿QUIÉN GANA EN PENALTIS?</div>
+                          <div style={{display:'flex',gap:8}}>
+                            <button onClick={()=>setAdminBetPenaltyDraft(p=>({...p,[m.id]:m.home_team}))} style={{flex:1,padding:'7px 4px',borderRadius:8,border:`2px solid ${selPenalty===m.home_team?'var(--gold)':'var(--border)'}`,background:selPenalty===m.home_team?'rgba(245,197,24,0.15)':'var(--surface2)',color:selPenalty===m.home_team?'var(--gold)':'var(--text-dim)',cursor:'pointer',fontSize:11,fontWeight:700}}>
+                              {flag(m.home_team)} {m.home_team}
+                            </button>
+                            <button onClick={()=>setAdminBetPenaltyDraft(p=>({...p,[m.id]:m.away_team}))} style={{flex:1,padding:'7px 4px',borderRadius:8,border:`2px solid ${selPenalty===m.away_team?'var(--gold)':'var(--border)'}`,background:selPenalty===m.away_team?'rgba(245,197,24,0.15)':'var(--surface2)',color:selPenalty===m.away_team?'var(--gold)':'var(--text-dim)',cursor:'pointer',fontSize:11,fontWeight:700}}>
+                              {flag(m.away_team)} {m.away_team}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                <button className="btn" style={{width:'100%',marginTop:4}} onClick={handleSaveAdminBet} disabled={savingAdminBet}>
+                  {savingAdminBet ? 'Guardando...' : `✅ Guardar porra de ${player.name}`}
+                </button>
+              </>)}
+              {rounds.length===0 && <div className="empty"><div className="ei">📅</div><p>No hay jornadas</p></div>}
+            </>
+          );
+        })()}
 
         {adminTab === 'players' && (
           <>
