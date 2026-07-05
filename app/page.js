@@ -4,8 +4,11 @@ import { supabase } from '../lib/supabase';
 import { flag, calcPoints, calcPointsBreakdown, computeStandings, getRoundAwards, ALL_COUNTRIES, AVATAR_EMOJIS, ADMIN_PASSWORD } from '../lib/game';
 
 // ── CSS ───────────────────────────────────────────────────────────────────────
-const BALL_IMG = "/ball.png";
-const TROPHY_IMG = "/trophy.png";
+
+
+
+const Ball = ({size=24, style={}}) => <img src="/ball.png" alt="⚽" width={size} height={size} style={{objectFit:'contain',verticalAlign:'middle',...style}}/>;
+const Trophy = ({size=24, style={}}) => <img src="/trophy.png" alt="🏆" width={size} height={size} style={{objectFit:'contain',verticalAlign:'middle',...style}}/>;
 
 const css = `
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;900&display=swap');
@@ -531,7 +534,7 @@ const handleRegister = async () => {
       </div>
 
       <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:30,letterSpacing:4,color:'#f5c518',animation:'wcGlow 1.6s ease-in-out infinite',marginBottom:18}}>
-        🏆 MUNDIAL PORRAS
+        MUNDIAL PORRAS
       </div>
 
       <div style={{position:'relative',width:90,height:120,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end'}}>
@@ -698,9 +701,9 @@ const handleRegister = async () => {
           <div className="intro-flare"/>
           <div className="intro-grass"/>
           <div style={{position:'relative',zIndex:3,display:'flex',flexDirection:'column',alignItems:'center'}}>
-            <div className="intro-ball"><img src={BALL_IMG} alt="ball" style={{width:100,height:100,objectFit:"contain",display:"block"}}/></div>
+            <div className="intro-ball"><Ball size={100} style={{display:"block"}}/></div>
             <div className="intro-ball-shadow"/>
-            <div className="intro-trophy"><img src={TROPHY_IMG} alt="trophy" style={{width:110,height:"auto",objectFit:"contain",display:"block"}}/></div>
+            <div className="intro-trophy"><Trophy size={110} style={{display:"block"}}/></div>
             <div className="intro-title">MUNDIAL<br/><span>PORRAS</span></div>
             <div className="intro-line"/>
             <div className="intro-sub">WORLD CUP 2026</div>
@@ -724,10 +727,10 @@ const handleRegister = async () => {
     return (
       <>
         <div className="hero">
-          <div className="ht">🏆 MUNDIAL PORRAS</div>
+          <div className="ht"><Trophy size={22} style={{marginRight:8}}/>MUNDIAL PORRAS</div>
           <div className="hs">{currentPlayer ? `${currentPlayer.avatar} ${currentPlayer.name} · #${myPos} de ${players.length}` : 'Regístrate y compite'}</div>
           {mySt && <div style={{marginTop:8,display:'flex',gap:8,justifyContent:'center',flexWrap:'wrap'}}>
-            <span className="pill ppt">🏆 {mySt.pts} pts</span>
+            <span className="pill ppt"><Trophy size={14} style={{marginRight:3}}/>{mySt.pts} pts</span>
             <span className="pill pe">🎯 {mySt.exact} exactos</span>
             <span className="pill pdn">👑 {mySt.mvps} MVP</span>
           </div>}
@@ -738,7 +741,7 @@ const handleRegister = async () => {
             <div style={{fontSize:48,marginBottom:12}}>👥</div>
             <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:20,color:'var(--gold)',marginBottom:8}}>SIN JUGADORES AÚN</div>
             <div style={{fontSize:13,color:'var(--text-dim)',marginBottom:16,lineHeight:1.5}}>Comparte la URL con tus amigos y que cada uno se registre.</div>
-            <button className="btn" onClick={() => setModal('register')}>⚽ Registrarme</button>
+            <button className="btn" onClick={() => setModal('register')}><Ball size={16} style={{marginRight:6}}/>Registrarme</button>
           </div>
         )}
 
@@ -794,9 +797,9 @@ const handleRegister = async () => {
                   </div>
                 ))}
               </div>
-              {canBet(nextRound) && <button className="btn" style={{marginTop:12}} onClick={() => { setSelectedRoundId(nextRound.id); setBetDraft({}); setModal('bet'); }}>⚽ Hacer mi porra</button>}
+              {canBet(nextRound) && <button className="btn" style={{marginTop:12}} onClick={() => { setSelectedRoundId(nextRound.id); setBetDraft({}); setModal('bet'); }}><Ball size={16} style={{marginRight:6}}/>Hacer mi porra</button>}
               {hasBet(nextRound) && <div className="prsent">✅ Porra enviada — ¡Buena suerte!</div>}
-              {!currentPlayer && <button className="btn" style={{marginTop:12}} onClick={() => setModal('register')}>⚽ Unirse</button>}
+              {!currentPlayer && <button className="btn" style={{marginTop:12}} onClick={() => setModal('register')}><Ball size={16} style={{marginRight:6}}/>Unirse</button>}
             </div>
           </>
         )}
@@ -833,7 +836,7 @@ const handleRegister = async () => {
           </>
         )}
 
-        {!currentPlayer && <button className="btn" style={{marginTop:8}} onClick={() => setModal('register')}>⚽ Unirse al mundial</button>}
+        {!currentPlayer && <button className="btn" style={{marginTop:8}} onClick={() => setModal('register')}><Ball size={16} style={{marginRight:6}}/>Unirse al mundial</button>}
       </>
     );
   };
@@ -842,7 +845,7 @@ const handleRegister = async () => {
   const renderStandings = () => (
     <>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
-        <div className="ct" style={{fontSize:22}}>🏆 CLASIFICACIÓN</div>
+        <div className="ct" style={{fontSize:22}}><Trophy size={20} style={{marginRight:8}}/>CLASIFICACIÓN</div>
         <span style={{fontSize:12,color:'var(--text-muted)'}}>{doneRounds.length} jornada{doneRounds.length!==1?'s':''}</span>
       </div>
       {players.length === 0 && <div className="empty"><div className="ei">👥</div><p>Sin jugadores aún</p></div>}
@@ -1082,7 +1085,7 @@ const handleRegister = async () => {
           <div style={{color:'var(--text-dim)',fontSize:13}}>#{rank} de {players.length} jugadores</div>
         </div>
         <div className="sg">
-          {[{l:'Puntos',v:st?.pts||0,i:'🏆'},{l:'Exactos',v:st?.exact||0,i:'🎯'},{l:'Signos',v:st?.sign||0,i:'✅'},
+          {[{l:'Puntos',v:st?.pts||0,i:<Trophy size={18}/>},{l:'Exactos',v:st?.exact||0,i:'🎯'},{l:'Signos',v:st?.sign||0,i:'✅'},
             {l:'MVPs',v:st?.mvps||0,i:'👑'},{l:'Avg/jorn',v:avg,i:'📊'},{l:'Particip.',v:`${st?.rounds||0}/${doneRounds.length}`,i:'📅'}].map(({l,v,i}) => (
             <div key={l} className="sbox"><div style={{fontSize:22}}>{i}</div><div className="snum">{v}</div><div className="slbl">{l}</div></div>
           ))}
@@ -1332,7 +1335,7 @@ const handleRegister = async () => {
                     </div>
                   );
                 })}
-                <button className="btn" onClick={() => handleEnterResults(r.id)}>🏆 Guardar resultados de {r.name}</button>
+                <button className="btn" onClick={() => handleEnterResults(r.id)}><Trophy size={16} style={{marginRight:6}}/>Guardar resultados de {r.name}</button>
               </div>
             ))}
           </>
@@ -1474,7 +1477,7 @@ const handleRegister = async () => {
       <div className="ov" onClick={e => e.target===e.currentTarget && setModal(null)}>
         <div className="modal">
           <div className="mhdl"/>
-          <div className="mtit">⚽ {round.name} — Tu porra</div>
+          <div className="mtit"><Ball size={18} style={{marginRight:6}}/>{round.name} — Tu porra</div>
           <div style={{fontSize:12,color:'var(--text-dim)',marginBottom:10}}>Cierra: {new Date(round.start_time).toLocaleString('es-ES',{weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
           <div style={{fontSize:11,color:'var(--text-muted)',marginBottom:14,background:'var(--surface2)',padding:'8px 12px',borderRadius:8}}>
             🎯 Exacto +4 · ✅ Signo 1X2 +2 · Participas +1
@@ -1543,7 +1546,7 @@ const handleRegister = async () => {
 
       <div className="app">
         <div className="topbar">
-          <div className="logo">MUNDIAL<span> PORRAS</span> 🏆</div>
+          <div className="logo">MUNDIAL<span> PORRAS</span> <Trophy size={20} style={{marginLeft:4}}/></div>
           <div className="topbar-r">
             {refreshing && <div className="spinner"/>}
             {!currentPlayer && <button className="btn-icon" onClick={()=>setModal('register')}>👤</button>}
