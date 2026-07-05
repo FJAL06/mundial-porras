@@ -10,6 +10,8 @@ import { flag, calcPoints, calcPointsBreakdown, computeStandings, getRoundAwards
 const Ball = ({size=24, style={}}) => <img src="/ball.png" alt="⚽" width={size} height={size} style={{objectFit:'contain',verticalAlign:'middle',...style}}/>;
 const Trophy = ({size=24, style={}}) => <img src="/trophy.png" alt="🏆" width={size} height={size} style={{objectFit:'contain',verticalAlign:'middle',...style}}/>;
 
+const INTRO_AUDIO = "/intro.mp3";
+
 const css = `
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;900&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
@@ -697,7 +699,8 @@ const handleRegister = async () => {
           .intro-flags span:nth-child(5){animation:introFlagWave .4s 1.8s ease both}
           .intro-flags span:nth-child(6){animation:introFlagWave .4s 1.95s ease both}
         `}</style>
-        <div className="intro-wrap">
+        <audio autoPlay src={INTRO_AUDIO} style={{display:'none'}}/>
+      <div className="intro-wrap">
           <div className="intro-flare"/>
           <div className="intro-grass"/>
           <div style={{position:'relative',zIndex:3,display:'flex',flexDirection:'column',alignItems:'center'}}>
