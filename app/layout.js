@@ -11,6 +11,8 @@ export default function RootLayout({ children }) {
         <meta name="theme-color" content="#060f0a"/>
         <meta name="apple-mobile-web-app-capable" content="yes"/>
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+        <meta name="apple-mobile-web-app-title" content="Porras"/>
+        <link rel="apple-touch-icon" href="/trophy.png"/>
         <link rel="manifest" href="/manifest.json"/>
       </head>
       <body style={{margin:0,padding:0,background:'#060f0a'}}>{children}</body>
